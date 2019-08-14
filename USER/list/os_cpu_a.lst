@@ -1,0 +1,667 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000         ;/*********************** (C) COPYRIGHT 2010 Libraworks 
+                       *************************
+    2 00000000         ;* File Name : os_cpu_a.asm 
+    3 00000000         ;* Author  : Librae 
+    4 00000000         ;* Version  : V1.0
+    5 00000000         ;* Date   : 06/10/2010
+    6 00000000         ;* Description : ¦ÌCOS-II asm port
+    7 00000000         ;*******************************************************
+                       ************************/
+    8 00000000         
+    9 00000000                 IMPORT           OSRunning   ; External referenc
+                                                            es
+   10 00000000                 IMPORT           OSPrioCur
+   11 00000000                 IMPORT           OSPrioHighRdy
+   12 00000000                 IMPORT           OSTCBCur
+   13 00000000                 IMPORT           OSTCBHighRdy
+   14 00000000                 IMPORT           OSIntNesting
+   15 00000000                 IMPORT           OSIntExit
+   16 00000000                 IMPORT           OSTaskSwHook
+   17 00000000                 IMPORT           OSInterrputSum
+   18 00000000         
+   19 00000000         
+   20 00000000                 EXPORT           OSStartHighRdy
+   21 00000000                 EXPORT           OSCtxSw
+   22 00000000                 EXPORT           OSIntCtxSw
+   23 00000000                 EXPORT           OS_ENTER_CRITICAL
+   24 00000000                 EXPORT           OS_EXIT_CRITICAL
+   25 00000000                 EXPORT           ItDisAll
+   26 00000000         
+   27 00000000                 EXPORT           PendSV_Handler
+   28 00000000         
+   29 00000000         ;*******************************************************
+                       *************************************************
+   30 00000000         ;                                                EQUATES
+                       
+   31 00000000         ;*******************************************************
+                       *************************************************
+   32 00000000         
+   33 00000000 E000ED04 
+                       NVIC_INT_CTRL
+                               EQU              0xE000ED04  ; Interrupt control
+                                                             state register.
+   34 00000000 E000ED20 
+                       NVIC_SYSPRI2
+                               EQU              0xE000ED20  ; System priority r
+                                                            egister (priority 2
+                                                            ).
+   35 00000000 FFFF0000 
+                       NVIC_PENDSV_PRI
+                               EQU              0xFFFF0000  ; PendSV priority v
+                                                            alue (lowest).
+   36 00000000 10000000 
+                       NVIC_PENDSVSET
+                               EQU              0x10000000  ; Value to trigger 
+                                                            PendSV exception.
+   37 00000000         
+   38 00000000         ;*******************************************************
+                       *************************************************
+   39 00000000         ;                                      CODE GENERATION D
+
+
+
+ARM Macro Assembler    Page 2 
+
+
+                       IRECTIVES
+   40 00000000         ;*******************************************************
+                       *************************************************
+   41 00000000         
+   42 00000000         ;AREA |.text|, CODE, READONLY, ALIGN=2
+   43 00000000         ;THUMB
+   44 00000000         ;REQUIRE8
+   45 00000000         ;PRESERVE8
+   46 00000000         
+   47 00000000         
+   48 00000000                 PRESERVE8
+   49 00000000         
+   50 00000000                 AREA             |.text|, CODE, READONLY
+   51 00000000                 THUMB
+   52 00000000         
+   53 00000000         
+   54 00000000         
+   55 00000000         ;/******************************************************
+                       *********************************
+   56 00000000         ;* Function name: OS_ENTER_CRITICAL
+   57 00000000         ;*
+   58 00000000         ;* Functional Description: Exit critical section
+   59 00000000         ;*
+   60 00000000         ;* Parameters: None
+   61 00000000         ;*
+   62 00000000         ;* Return Value: None
+   63 00000000         ;*******************************************************
+                       **********************************/ 
+   64 00000000         
+   65 00000000         OS_ENTER_CRITICAL
+   66 00000000         
+   67 00000000 B672            CPSID            I           ; Disable all the i
+                                                            nterrupts
+   68 00000002         
+   69 00000002 B406            PUSH             {R1,R2}
+   70 00000004         
+   71 00000004 492B            LDR              R1, =OSInterrputSum 
+                                                            ; OSInterrputSum++
+   72 00000006 780A            LDRB             R2, [R1]
+   73 00000008 F102 0201       ADD              R2, R2, #1
+   74 0000000C 700A            STRB             R2, [R1]
+   75 0000000E BC06            POP              {R1,R2}
+   76 00000010 4770            BX               LR
+   77 00000012         
+   78 00000012         ;/******************************************************
+                       *********************************
+   79 00000012         ;* Function name: OS_EXIT_CRITICAL
+   80 00000012         ;*
+   81 00000012         ;* Functional Description: Exit critical section
+   82 00000012         ;*
+   83 00000012         ;* Parameters: None
+   84 00000012         ;*
+   85 00000012         ;* Return Value: None
+   86 00000012         ;*******************************************************
+                       **********************************/
+   87 00000012         
+   88 00000012         OS_EXIT_CRITICAL
+   89 00000012 B406            PUSH             {R1, R2}
+   90 00000014 4927            LDR              R1, =OSInterrputSum 
+
+
+
+ARM Macro Assembler    Page 3 
+
+
+                                                            ; OSInterrputSum--
+   91 00000016 780A            LDRB             R2, [R1]
+   92 00000018 F1A2 0201       SUB              R2, R2, #1
+   93 0000001C 700A            STRB             R2, [R1]
+   94 0000001E F04F 0100       MOV              R1,  #0
+   95 00000022 2A00            CMP              R2,  #0     ; if OSInterrputSum
+                                                            =0,enable 
+   96 00000024         ; interruptsÈç¹ûOSInterrputSum=0£¬
+   97 00000024 BF08 F381 
+              8810             MSREQ            PRIMASK, R1
+   98 0000002A BC06            POP              {R1, R2}
+   99 0000002C 4770            BX               LR
+  100 0000002E         
+  101 0000002E         ;*******************************************************
+                       *************************************************
+  102 0000002E         ;                                          START MULTITA
+                       SKING
+  103 0000002E         ;                                       void OSStartHigh
+                       Rdy(void)
+  104 0000002E         ;
+  105 0000002E         ; Note(s) : 1) This function triggers a PendSV exception
+                        (essentially, causes a context switch) to cause
+  106 0000002E         ;              the first task to start.
+  107 0000002E         ;
+  108 0000002E         ;           2) OSStartHighRdy() MUST:
+  109 0000002E         ;              a) Setup PendSV exception priority to low
+                       est;
+  110 0000002E         ;              b) Set initial PSP to 0, to tell context 
+                       switcher this is first run;
+  111 0000002E         ;              c) Set the main stack to OS_CPU_ExceptStk
+                       Base;
+  112 0000002E         ;              d) Set OSRunning to TRUE;
+  113 0000002E         ;              e) Trigger PendSV exception;
+  114 0000002E         ;              f) Enable interrupts (tasks will run with
+                        interrupts enabled).
+  115 0000002E         ;*******************************************************
+                       *************************************************  
+  116 0000002E         
+  117 0000002E         OSStartHighRdy
+  118 0000002E 4C22            LDR              R4, =NVIC_SYSPRI2 ; set the Pen
+                                                            dSV exception prior
+                                                            ity
+  119 00000030 4D22            LDR              R5, =NVIC_PENDSV_PRI
+  120 00000032 6025            STR              R5, [R4]
+  121 00000034         
+  122 00000034 F04F 0400       MOV              R4, #0      ; set the PSP to 0 
+                                                            for initial context
+                                                             switch call
+  123 00000038 F384 8809       MSR              PSP, R4
+  124 0000003C         
+  125 0000003C 4C20            LDR              R4, =OSRunning 
+                                                            ; OSRunning = TRUE
+  126 0000003E F04F 0501       MOV              R5, #1
+  127 00000042 7025            STRB             R5, [R4]
+  128 00000044         
+  129 00000044         ;Switch to the highest priority task
+  130 00000044 4C1F            LDR              R4, =NVIC_INT_CTRL ;Trigger the
+                                                             PendSV exception (
+                                                            causes context swit
+
+
+
+ARM Macro Assembler    Page 4 
+
+
+                                                            ch)
+  131 00000046 F04F 5580       LDR              R5, =NVIC_PENDSVSET
+  132 0000004A 6025            STR              R5, [R4]
+  133 0000004C         
+  134 0000004C B662            CPSIE            I           ;enable interrupts 
+                                                            at processor level
+  135 0000004E         OSStartHang
+  136 0000004E E7FE            B                OSStartHang ;should never get h
+                                                            ere
+  137 00000050         
+  138 00000050         ;*******************************************************
+                       *************************************************
+  139 00000050         ;                               PERFORM A CONTEXT SWITCH
+                        (From task level)
+  140 00000050         ;                                           void OSCtxSw
+                       (void)
+  141 00000050         ;
+  142 00000050         ; Note(s) : 1) OSCtxSw() is called when OS wants to perf
+                       orm a task context switch.  This function
+  143 00000050         ;              triggers the PendSV exception which is wh
+                       ere the real work is done.
+  144 00000050         ;*******************************************************
+                       *************************************************
+  145 00000050         
+  146 00000050         OSCtxSw
+  147 00000050 B430            PUSH             {R4, R5}
+  148 00000052 4C1C            LDR              R4, =NVIC_INT_CTRL ; Trigger th
+                                                            e PendSV exception 
+                                                            (causes context swi
+                                                            tch)
+  149 00000054 F04F 5580       LDR              R5, =NVIC_PENDSVSET
+  150 00000058 6025            STR              R5, [R4]
+  151 0000005A BC30            POP              {R4, R5}
+  152 0000005C 4770            BX               LR
+  153 0000005E         
+  154 0000005E         ;*******************************************************
+                       *************************************************
+  155 0000005E         ;                             PERFORM A CONTEXT SWITCH (
+                       From interrupt level)
+  156 0000005E         ;                                         void OSIntCtxS
+                       w(void)
+  157 0000005E         ;
+  158 0000005E         ; Notes:    1) OSIntCtxSw() is called by OSIntExit() whe
+                       n it determines a context switch is needed as
+  159 0000005E         ;              the result of an interrupt.  This functio
+                       n simply triggers a PendSV exception which will
+  160 0000005E         ;              be handled when there are no more interru
+                       pts active and interrupts are enabled.
+  161 0000005E         ;*******************************************************
+                       *************************************************
+  162 0000005E         
+  163 0000005E         OSIntCtxSw
+  164 0000005E B430            PUSH             {R4, R5}
+  165 00000060 4C18            LDR              R4, =NVIC_INT_CTRL ; Trigger th
+                                                            e PendSV exception 
+                                                            (causes context swi
+                                                            tch)
+  166 00000062 F04F 5580       LDR              R5, =NVIC_PENDSVSET
+  167 00000066 6025            STR              R5, [R4]
+
+
+
+ARM Macro Assembler    Page 5 
+
+
+  168 00000068 BC30            POP              {R4, R5}
+  169 0000006A 4770            BX               LR
+  170 0000006C BF00            NOP
+  171 0000006E         
+  172 0000006E         ;*******************************************************
+                       *************************************************
+  173 0000006E         ;                                         HANDLE PendSV 
+                       EXCEPTION
+  174 0000006E         ;                                     void OS_CPU_PendSV
+                       Handler(void)
+  175 0000006E         ;
+  176 0000006E         ; Note(s) : 1) PendSV is used to cause a context switch.
+                         This is a recommended method for performing
+  177 0000006E         ;              context switches with Cortex-M3.  This is
+                        because the Cortex-M3 auto-saves half of the
+  178 0000006E         ;              processor context on any exception, and r
+                       estores same on return from exception.  So only
+  179 0000006E         ;              saving of R4-R11 is required and fixing u
+                       p the stack pointers.  Using the PendSV exception
+  180 0000006E         ;              this way means that context saving and re
+                       storing is identical whether it is initiated from
+  181 0000006E         ;              a thread or occurs due to an interrupt or
+                        exception.
+  182 0000006E         ;
+  183 0000006E         ;           2) Pseudo-code is:
+  184 0000006E         ;              a) Get the process SP, if 0 then skip (go
+                       to d) the saving part (first context switch);
+  185 0000006E         ;              b) Save remaining regs r4-r11 on process 
+                       stack;
+  186 0000006E         ;              c) Save the process SP in its TCB, OSTCBC
+                       ur->OSTCBStkPtr = SP;
+  187 0000006E         ;              d) Call OSTaskSwHook();
+  188 0000006E         ;              e) Get current high priority, OSPrioCur =
+                        OSPrioHighRdy;
+  189 0000006E         ;              f) Get current ready thread TCB, OSTCBCur
+                        = OSTCBHighRdy;
+  190 0000006E         ;              g) Get new process SP from TCB, SP = OSTC
+                       BHighRdy->OSTCBStkPtr;
+  191 0000006E         ;              h) Restore R4-R11 from new process stack;
+                       
+  192 0000006E         ;              i) Perform exception return which will re
+                       store remaining context.
+  193 0000006E         ;
+  194 0000006E         ;           3) On entry into PendSV handler:
+  195 0000006E         ;              a) The following have been saved on the p
+                       rocess stack (by processor):
+  196 0000006E         ;                 xPSR, PC, LR, R12, R0-R3
+  197 0000006E         ;              b) Processor mode is switched to Handler 
+                       mode (from Thread mode)
+  198 0000006E         ;              c) Stack is Main stack (switched from Pro
+                       cess stack)
+  199 0000006E         ;              d) OSTCBCur      points to the OS_TCB of 
+                       the task to suspend
+  200 0000006E         ;                 OSTCBHighRdy  points to the OS_TCB of 
+                       the task to resume
+  201 0000006E         ;
+  202 0000006E         ;           4) Since PendSV is set to lowest priority in
+                        the system (by OSStartHighRdy() above), we
+  203 0000006E         ;              know that it will only be run when no oth
+
+
+
+ARM Macro Assembler    Page 6 
+
+
+                       er exception or interrupt is active, and
+  204 0000006E         ;              therefore safe to assume that context bei
+                       ng switched out was using the process stack (PSP).
+  205 0000006E         ;*******************************************************
+                       *************************************************
+  206 0000006E         
+  207 0000006E         PendSV_Handler
+  208 0000006E B672            CPSID            I           ; Prevent interrupt
+                                                            ion during context 
+                                                            switch
+  209 00000070 F3EF 8009       MRS              R0, PSP     ; PSP is process st
+                                                            ack pointer
+  210 00000074 B128            CBZ              R0, PendSV_Handler_Nosave ; Ski
+                                                            p register save the
+                                                             first time
+  211 00000076         
+  212 00000076 3820            SUBS             R0, R0, #0x20 ; Save remaining 
+                                                            regs r4-11 on proce
+                                                            ss stack
+  213 00000078 E880 0FF0       STM              R0, {R4-R11}
+  214 0000007C         
+  215 0000007C 4912            LDR              R1, =OSTCBCur ; OSTCBCur->OSTCB
+                                                            StkPtr = SP;
+  216 0000007E 6809            LDR              R1, [R1]
+  217 00000080 6008            STR              R0, [R1]    ; R0 is SP of proce
+                                                            ss being switched o
+                                                            ut
+  218 00000082         
+  219 00000082         ; At this point, entire context of process has been save
+                       d
+  220 00000082         PendSV_Handler_Nosave
+  221 00000082 B500            PUSH             {R14}       ; Save LR exc_retur
+                                                            n value
+  222 00000084 4811            LDR              R0, =OSTaskSwHook 
+                                                            ; OSTaskSwHook();
+  223 00000086 4780            BLX              R0
+  224 00000088 F85D EB04       POP              {R14}
+  225 0000008C         
+  226 0000008C 4810            LDR              R0, =OSPrioCur ; OSPrioCur = OS
+                                                            PrioHighRdy;
+  227 0000008E 4911            LDR              R1, =OSPrioHighRdy
+  228 00000090 780A            LDRB             R2, [R1]
+  229 00000092 7002            STRB             R2, [R0]
+  230 00000094         
+  231 00000094 480C            LDR              R0, =OSTCBCur ; OSTCBCur  = OST
+                                                            CBHighRdy;
+  232 00000096 4910            LDR              R1, =OSTCBHighRdy
+  233 00000098 680A            LDR              R2, [R1]
+  234 0000009A 6002            STR              R2, [R0]
+  235 0000009C         
+  236 0000009C 6810            LDR              R0, [R2]    ; R0 is new process
+                                                             SP; SP = OSTCBHigh
+                                                            Rdy->OSTCBStkPtr;
+  237 0000009E E890 0FF0       LDM              R0, {R4-R11} ; Restore r4-11 fr
+                                                            om new process stac
+                                                            k
+  238 000000A2 3020            ADDS             R0, R0, #0x20
+  239 000000A4 F380 8809       MSR              PSP, R0     ; Load PSP with new
+                                                             process SP
+
+
+
+ARM Macro Assembler    Page 7 
+
+
+  240 000000A8 F04E 0E04       ORR              LR, LR, #0x04 ; Ensure exceptio
+                                                            n return uses proce
+                                                            ss stack
+  241 000000AC B662            CPSIE            I
+  242 000000AE 4770            BX               LR          ; Exception return 
+                                                            will restore remain
+                                                            ing context
+  243 000000B0         
+  244 000000B0         
+  245 000000B0         ;/******************************************************
+                       ********************************
+  246 000000B0         ;* Function Name: ItDisAll
+  247 000000B0         ;*
+  248 000000B0         ;* Function Description: Turn off all interrupts of the 
+                       interrupt controller.
+  249 000000B0         ;*
+  250 000000B0         ;* Parameters: None
+  251 000000B0         ;*
+  252 000000B0         ;* Return Value: None
+  253 000000B0         ;*******************************************************
+                       ********************************/
+  254 000000B0         
+  255 000000B0         ItDisAll
+  256 000000B0 B672            CPSID            I
+  257 000000B2 4770            BX               LR
+  258 000000B4         
+  259 000000B4         
+  260 000000B4                 ALIGN
+  261 000000B4         
+  262 000000B4                 END
+              00000000 
+              E000ED20 
+              FFFF0000 
+              00000000 
+              E000ED04 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M3 --apcs=interw
+ork --depend=.\obj\os_cpu_a.d -o.\obj\os_cpu_a.o -I.\RTE\_Target_1 -IC:\Users\n
+goqu\AppData\Local\Arm\Packs\ARM\CMSIS\5.5.1\CMSIS\Core\Include -IC:\Users\ngoq
+u\AppData\Local\Arm\Packs\Keil\STM32F1xx_DFP\2.3.0\Device\Include --predefine="
+__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 527" --predefine="_RTE_ 
+SETA 1" --predefine="STM32F10X_MD SETA 1" --list=.\list\os_cpu_a.lst ..\UCOSII\
+PORT\os_cpu_a.asm
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+.text 00000000
+
+Symbol: .text
+   Definitions
+      At line 50 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      None
+Comment: .text unused
+ItDisAll 000000B0
+
+Symbol: ItDisAll
+   Definitions
+      At line 255 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 25 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: ItDisAll used once
+OSCtxSw 00000050
+
+Symbol: OSCtxSw
+   Definitions
+      At line 146 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 21 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSCtxSw used once
+OSIntCtxSw 0000005E
+
+Symbol: OSIntCtxSw
+   Definitions
+      At line 163 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 22 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSIntCtxSw used once
+OSStartHang 0000004E
+
+Symbol: OSStartHang
+   Definitions
+      At line 135 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 136 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSStartHang used once
+OSStartHighRdy 0000002E
+
+Symbol: OSStartHighRdy
+   Definitions
+      At line 117 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 20 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSStartHighRdy used once
+OS_ENTER_CRITICAL 00000000
+
+Symbol: OS_ENTER_CRITICAL
+   Definitions
+      At line 65 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 23 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OS_ENTER_CRITICAL used once
+OS_EXIT_CRITICAL 00000012
+
+Symbol: OS_EXIT_CRITICAL
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Relocatable symbols
+
+   Definitions
+      At line 88 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 24 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OS_EXIT_CRITICAL used once
+PendSV_Handler 0000006E
+
+Symbol: PendSV_Handler
+   Definitions
+      At line 207 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 27 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: PendSV_Handler used once
+PendSV_Handler_Nosave 00000082
+
+Symbol: PendSV_Handler_Nosave
+   Definitions
+      At line 220 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 210 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: PendSV_Handler_Nosave used once
+10 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Absolute symbols
+
+NVIC_INT_CTRL E000ED04
+
+Symbol: NVIC_INT_CTRL
+   Definitions
+      At line 33 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 130 in file ..\UCOSII\PORT\os_cpu_a.asm
+      At line 148 in file ..\UCOSII\PORT\os_cpu_a.asm
+      At line 165 in file ..\UCOSII\PORT\os_cpu_a.asm
+
+NVIC_PENDSVSET 10000000
+
+Symbol: NVIC_PENDSVSET
+   Definitions
+      At line 36 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 131 in file ..\UCOSII\PORT\os_cpu_a.asm
+      At line 149 in file ..\UCOSII\PORT\os_cpu_a.asm
+      At line 166 in file ..\UCOSII\PORT\os_cpu_a.asm
+
+NVIC_PENDSV_PRI FFFF0000
+
+Symbol: NVIC_PENDSV_PRI
+   Definitions
+      At line 35 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 119 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: NVIC_PENDSV_PRI used once
+NVIC_SYSPRI2 E000ED20
+
+Symbol: NVIC_SYSPRI2
+   Definitions
+      At line 34 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 118 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: NVIC_SYSPRI2 used once
+4 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+External symbols
+
+OSIntExit 00000000
+
+Symbol: OSIntExit
+   Definitions
+      At line 15 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      None
+Comment: OSIntExit unused
+OSIntNesting 00000000
+
+Symbol: OSIntNesting
+   Definitions
+      At line 14 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      None
+Comment: OSIntNesting unused
+OSInterrputSum 00000000
+
+Symbol: OSInterrputSum
+   Definitions
+      At line 17 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 71 in file ..\UCOSII\PORT\os_cpu_a.asm
+      At line 90 in file ..\UCOSII\PORT\os_cpu_a.asm
+
+OSPrioCur 00000000
+
+Symbol: OSPrioCur
+   Definitions
+      At line 10 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 226 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSPrioCur used once
+OSPrioHighRdy 00000000
+
+Symbol: OSPrioHighRdy
+   Definitions
+      At line 11 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 227 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSPrioHighRdy used once
+OSRunning 00000000
+
+Symbol: OSRunning
+   Definitions
+      At line 9 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 125 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSRunning used once
+OSTCBCur 00000000
+
+Symbol: OSTCBCur
+   Definitions
+      At line 12 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 215 in file ..\UCOSII\PORT\os_cpu_a.asm
+      At line 231 in file ..\UCOSII\PORT\os_cpu_a.asm
+
+OSTCBHighRdy 00000000
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+External symbols
+
+
+Symbol: OSTCBHighRdy
+   Definitions
+      At line 13 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 232 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSTCBHighRdy used once
+OSTaskSwHook 00000000
+
+Symbol: OSTaskSwHook
+   Definitions
+      At line 16 in file ..\UCOSII\PORT\os_cpu_a.asm
+   Uses
+      At line 222 in file ..\UCOSII\PORT\os_cpu_a.asm
+Comment: OSTaskSwHook used once
+9 symbols
+359 symbols in table

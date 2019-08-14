@@ -1,0 +1,40 @@
+UCOSII实验3：UCOSII信号量的使用测试
+
+1. 实验目的：信号量创建请求发送使用测试
+2. 实验现象：按下KEY0按键LED0将闪烁5次（10次反转）
+          按下KEY1按键LED0将反转一次
+		  按下KEY2按键LED0将循环闪烁，同时再按下KEY0,KEY1之后LED0状态不会改变
+		  
+3. 用到的UCOSII函数
+这里我们不再重复讲解之前实验讲解过的函数
+信号量创建函数 		
+OS_EVENT  *OSSemCreate (INT16U cnt)//创建初始值为cnt的信号量
+信号量发送函数：    
+INT8U  OSSemPost (OS_EVENT *pevent)；//调用一次，信号量计数器加1
+信号量请求函数：	
+void  OSSemPend (OS_EVENT *pevent, INT16U timeout, INT8U *err)//请求一次，信号量计数器减1
+信号量删除函数：   
+ OS_EVENT  *OSSemDel (OS_EVENT *pevent, INT8U opt, INT8U *err)//删除信号量，信号量相关函数将无效
+
+4. 实验描述
+关于信号量的基本概念之类的我们不详细讲解，我们光盘提供的UCOSII相关的资料有详细讲解这些概念，同时，推荐看任哲的书籍《嵌入式实时操作系统UCOSII原理与应用》。
+OSTaskCreate()函数创建TaskStart任务，
+在TaskStart任务5次调用ucos任务创建函数OSTaskCreate（）创建5个任务：TaskLed，TaskLed1，TaskLCD，TaskKey，TaskTouch，同时
+调用信号量创建函数Sem_Event=OSSemCreate(4)创建信号量Sem_Event。然后调用OSTaskSuspend()函数将
+TaskStart()任务挂起，因为在5个任务创建后，TaskStart任务该做的事情已经完毕，挂起任务。然后5个任务在循环执行；
+
+TaskLed： 	若请求得到信号量有效，LED0每隔600ms状态反转
+TaskLed1：	LED1每隔600ms状态反转
+TaskLCD:  	LCD上半部分一定区域颜色循环更换
+TaskKey： 	每隔20ms扫描按键值 。
+TaskTouch： 每隔2ms扫描触摸屏下半部分的触摸点，并显示在LCD上。也就是我们的触摸画板程序。
+
+在任务TaskKey中，我们循环扫描键值，如果KEY0按下，那么将调用信号量发送函数发送10次信号量，信号量计数器将增10
+ 	   for(i=0;i<10;i++)
+	   OSSemPost(Sem_Event); //连续发送信号量10次
+这个时候任务TaskLed正在请求信号量等待状态，此时任务将进入就绪状态， 将可以看到LED0闪烁5次。
+如果按下KEY1，那么将调用信号量发送函数发送1次信号量，信号量计数器将增加1，这个时候可以看到LED0状态反转
+      OSSemPost(Sem_Event); //发送一次信号量 
+如果KEY2(WK_UP)按键按下，那么将调用信号量删除函数删除信号量，信号量将无效。这个时候LED0恢复闪烁。
+ OSSemDel(Sem_Event,OS_DEL_ALWAYS,&err);
+ 其中参数OS_DEL_ALWAYS表明立即删除信号量。
