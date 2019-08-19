@@ -1,23 +1,7 @@
-#include "sys.h"
 #include "usart.h"
-//////////////////////////////////////////////////////////////////////////////////	 
-//This program is for learning use only and may not be used for any other purpose without the permission of the author.
-//ALIENTEK Mini STM32 development board
-// Serial port 1 initialization
-//Positive point atom @ALIENTEK
-//Technology Forum: www.openedv.com
-// Modified date: 2010/5/27
-//Version: V1.3
-//Copyright, piracy will be investigated.
-//Copyright(C) punctual atom 2009-2019
-//All rights reserved
-//********************************************************************************
-//V1.3 modification instructions
-// Support to adapt to the serial port baud rate settings at different frequencies.
-//Added support for printf
-// Added serial port receive command function.
-// Fixed a bug where the first character of printf was lost.
-////////////////////////////////////////////////////////////////////////////////// 	  
+#include <ucos_ii.h>
+//UART1 receiver timeout
+volatile uint16_t u1out = 50;// 50 is 50ms 
 
 
 //Add the following code to support the printf function without having to select use MicroLIB
@@ -36,10 +20,13 @@ _sys_exit(int x)
 { 
 	x = x; 
 } 
-//Redefine the fputc function
+//Kiem tra dinh nghia fputc
+//Redefining low-level library functions to enable direct use of high-level library functions in the C library
+//http://www.keil.com/support/man/docs/armlib/armlib_chr1358938931411.htm
 int fputc(int ch, FILE *f)
 {      
-	while((USART1->SR&0X40)==0);//Loop through until the send is complete  
+	while((USART1->SR&0X40)==0)
+		;//Loop through until the send is complete  
     USART1->DR = (u8) ch;      
 	return ch;
 }
@@ -70,8 +57,8 @@ u8 USART_RX_BUF[64];     //接收缓冲,最大64个字节.
 //bit5~0，接收到的有效字节数目
 u8 USART_RX_STA=0;       //接收状态标记
 
-void uart_init(u32 bound){
-    //GPIO端口设置
+void uart_init(u32 Baud){
+
     GPIO_InitTypeDef GPIO_InitStructure;
 	USART_InitTypeDef USART_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
@@ -88,18 +75,18 @@ void uart_init(u32 bound){
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_Init(GPIOA, &GPIO_InitStructure);  
 
-   //Usart1 NVIC 配置
+   //Usart1 NVIC
 
-    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=3 ;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;		//
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;		
 
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQ通道使能
-	NVIC_Init(&NVIC_InitStructure);	//根据NVIC_InitStruct中指定的参数初始化外设NVIC寄存器USART1
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			
+	NVIC_Init(&NVIC_InitStructure);	
   
    //USART Initialization settings
    
-	USART_InitStructure.USART_BaudRate = bound;//Generally set to 9600;
+	USART_InitStructure.USART_BaudRate = Baud;//Generally set to 9600;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -111,34 +98,43 @@ void uart_init(u32 bound){
 
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);//Open interrupt
    
-    USART_Cmd(USART1, ENABLE);                    //使能串口 
+    USART_Cmd(USART1, ENABLE);               
 
 }
 
-void USART1_IRQHandler(void)                	//串口1中断服务程序
+// USART Receiver buffer
+uint8_t USART1_index=0,USART1_rx_data_buff[RX_BUFFER_SIZE0];
+
+void USART1_IRQHandler(void)
+{
+	OS_CPU_SR  cpu_sr;
+  char USART1_data;
+	OS_ENTER_CRITICAL();                         /* Tell uC/OS-II that we are starting an ISR          */
+  OS_EXIT_CRITICAL();
+	
+	
+	/* RXNE handler */
+  if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
 	{
-	u8 Res;
-	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
-		{
-		Res =USART_ReceiveData(USART1);//(USART1->DR);	//读取接收到的数据
-		
-		if((USART_RX_STA&0x80)==0)//接收未完成
-			{
-			if(USART_RX_STA&0x40)//接收到了0x0d
-				{
-				if(Res!=0x0a)USART_RX_STA=0;//接收错误,重新开始
-				else USART_RX_STA|=0x80;	//接收完成了 
-				}
-			else //还没收到0X0D
-				{	
-				if(Res==0x0d)USART_RX_STA|=0x40;
-				else
-					{
-					USART_RX_BUF[USART_RX_STA&0X3F]=Res ;
-					USART_RX_STA++;
-					if(USART_RX_STA>63)USART_RX_STA=0;//接收数据错误,重新开始接收	  
-					}		 
-				}
-			}   		 
-     } 
+		//USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+		USART1_data=(USART1->DR & (uint16_t)0x01FF);
+		u1out = 50;// 50ms
+		USART1_rx_data_buff[USART1_index++]=USART1_data;
+
+		if(USART1_index==RX_BUFFER_SIZE0) USART1_index=0;
+		//printf("Kiem tra uart 1\r\n");	
+	}
+	OSIntExit();
+
 } 
+
+
+void printmcuclk(void)
+{
+	// Check mcu clock
+	RCC_ClocksTypeDef mcu_clk;
+	RCC_GetClocksFreq(&mcu_clk);
+	printf(">Thach anh: \r\nADCCLK:%d\r\nHCLK:%d\r\nPCLK1:%d\r\nPCLK2:%d\r\nSYSCLK:%d",
+																mcu_clk.ADCCLK_Frequency,mcu_clk.HCLK_Frequency,
+																mcu_clk.PCLK1_Frequency,mcu_clk.PCLK2_Frequency,mcu_clk.SYSCLK_Frequency);
+}

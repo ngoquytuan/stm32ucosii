@@ -1,5 +1,6 @@
 #include "ntpserver.h"
-extern volatile uint32_t ms10k;
+#include <ucos_ii.h>
+
 extern time_t timenow;
 //for NTP server
 time_t unixTime_last_sync = 1559640302;// lan chuan gio gan nhat 
@@ -19,11 +20,15 @@ int32_t NTPUDP(uint8_t sn)
    uint16_t size, sentsize=0;
    uint8_t  destip[4];
    uint16_t destport;
-	 uint8_t i;
+	 //uint8_t i;
+	OS_CPU_SR  cpu_sr;
 	// Ban tin NTP co size = 56 ( ca header : IP[4],port[2],length[2], tru di header chi con 48
    switch(getSn_SR(sn))
    {
       case SOCK_UDP :
+				
+				OS_ENTER_CRITICAL();                         /* Tell uC/OS-II that we are starting an ISR          */
+			
          if((size = getSn_RX_RSR(sn)) == NTP_PACKET_RAWSIZE)//56 is size raw of NTP message
          {
 					 //printf("\r\nsize:%d, ret:%d, NTP: ",size,ret); 
@@ -73,7 +78,8 @@ int32_t NTPUDP(uint8_t sn)
 						memcpy(&serverPacket[36], &micros_recv, 4);
 						
 						transmitTime = (timenow + STARTOFTIME);//gio luc tryen ban tin
-						micros_transmit = 100*ms10k;
+						//micros_transmit = 100*ms10k;
+					  //micros_transmit = 100*(TIM3->CNT);
 						//printf("tranTime: %u, micros_tran:%u\r\n",transmitTime,micros_transmit);
 						
 						transmitTime = htonl(transmitTime);// gio luc truyen
@@ -81,7 +87,8 @@ int32_t NTPUDP(uint8_t sn)
 						
 						
 						//Tinh toan phan thap phan cua thoi diem truyen tin
-						micros_transmit = 100*ms10k;
+						//micros_transmit = 100*ms10k;
+						micros_transmit = 100*(TIM3->CNT);
 						micros_transmit = (micros_transmit + 1) * USECSHIFT;
 						micros_transmit = htonl(micros_transmit);//Ko hieu lam gi nhi, nhung dung!
 						memcpy(&serverPacket[44], &micros_transmit, 4);
@@ -96,9 +103,12 @@ int32_t NTPUDP(uint8_t sn)
                }
                sentsize += ret; // Don't care SOCKERR_BUSY, because it is zero.
             }
+						
 						wzn_event_handle();
 						//printf("\r\nNTPsent \r\n");
          }
+				 OS_EXIT_CRITICAL();
+				 OSIntExit();
          break;
       case SOCK_CLOSED:
 				 
@@ -121,7 +131,7 @@ void ntpserverdefaultconfig(void)
 		serverPacket[0] = 0x24;   // LI, Version, Mode // Set version number and mode
 		serverPacket[1] = 1; // Stratum, or type of clock
 		serverPacket[2] = 0;     // Polling Interval
-		serverPacket[3] = -12;  // Peer Clock Precision
+		serverPacket[3] = 0xF4;//-12;  // Peer Clock Precision
 		serverPacket[12] = 'G';
 		serverPacket[13] = 'P';
 		serverPacket[14] = 'S';
@@ -133,7 +143,7 @@ void wzn_event_handle(void)
 {
 	uint16_t ir = 0;
 	uint8_t sir = 0;
-	uint16_t len = 0;
+	//uint16_t len = 0;
 	static const int8_t WZN_ERR = -1;
 	
 	
@@ -167,3 +177,30 @@ void wzn_event_handle(void)
 		}
 	}
 }
+
+//Interrupt line 3 PA3 responds to data from W5500 and concatenates a flag.
+void EXTI3_IRQHandler(void)
+{
+		OS_CPU_SR  cpu_sr;
+		//OSIntEnter();
+
+    OS_ENTER_CRITICAL();                         /* Tell uC/OS-II that we are starting an ISR          */
+    
+    
+	if(EXTI_GetITStatus(EXTI_Line3) != RESET)
+	{
+		micros_recv = 100*(TIM3->CNT);
+		OS_EXIT_CRITICAL();
+		EXTI_ClearITPendingBit(EXTI_Line3);	//Clear interrupt line
+		//micros_recv = 100*ms10k;
+		
+		recvTime = (timenow + STARTOFTIME);//gio luc nhan dc ban tin	
+		NTPUDP(SOCK_UDPS);
+		//W5500RecInt=1;
+		//printf("EXTI3_IRQHandler\r\n");
+		//ntpserverprocess();
+
+	}
+	OSIntExit();
+}
+

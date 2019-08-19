@@ -11,9 +11,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "socketdefines.h"
 #include <stdint.h>
-
+#include <string.h>
+#include <stdio.h>
+#include <time.h>
+#include "socket.h"
+#include "dns.h"
+#include "w5500init.h"
+#include "socketdefines.h"
 /*
  * @brief Define it for Debug & Monitor DNS processing.
  * @note If defined, it dependens on <stdio.h>
@@ -64,8 +69,8 @@ typedef struct _datetime
 #define UTC_ADJ_HRS		7              	        // Vietnam : GMT+7
 #define EPOCH			1900                    // NTP start year
 
-void SNTP_init();
-int8_t SNTP_run();
+void SNTP_init(void);
+int8_t SNTP_run(void);
 
 #ifdef __cplusplus
 }

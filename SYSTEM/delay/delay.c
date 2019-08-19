@@ -1,7 +1,8 @@
 #include "delay.h"
 #include "sys.h"
+#include "os_cpu.h"
+#include "ucos_ii.h"
 // If you use ucos, include the following header file. If not used, comment out.
-#include "includes.h"//ucos 使用
 //////////////////////////////////////////////////////////////////////////////////	 
 //This program is for learning use only and may not be used for any other purpose without the permission of the author.
 //Mini STM32 development board
@@ -34,15 +35,15 @@
 static u8  fac_us=0;//us Time delay multiplier			   
 static u16 fac_ms=0;//Ms delay multiplier, under ucos, represents the number of ms per beat
 
-#ifdef OS_CRITICAL_METHOD 	//If OS_CRITICAL_METHOD is defined, it means using ucosII.
-//systick Interrupt service function, used when using ucos
-void SysTick_Handler(void)
-{				   
-	OSIntEnter();		//Entry break
-    OSTimeTick();       //Calling ucos clock service program             
-    OSIntExit();        //Trigger task switching soft interrupt
-}
-#endif
+//#ifdef OS_CRITICAL_METHOD 	//If OS_CRITICAL_METHOD is defined, it means using ucosII.
+////systick Interrupt service function, used when using ucos
+//void SysTick_Handler(void)
+//{				   
+//	OSIntEnter();		//Entry break
+//    OSTimeTick();       //Calling ucos clock service program             
+//    OSIntExit();        //Trigger task switching soft interrupt
+//}
+//#endif
 
 
 // Initialize the delay function
@@ -77,52 +78,53 @@ void delay_us(u32 nus)
 {		
 	u32 ticks;
 	u32 told,tnow,tcnt=0;
-	u32 reload=SysTick->LOAD;	//LOAD的值	    	 
-	ticks=nus*fac_us; 			//需要的节拍数	  		 
+	u32 reload=SysTick->LOAD;	//LOAD value    	 
+	ticks=nus*fac_us; 			//Number of beats required	  		 
 	tcnt=0;
-	told=SysTick->VAL;        	//刚进入时的计数器值
+	told=SysTick->VAL;        	//Counter value just entered
 	while(1)
 	{
 		tnow=SysTick->VAL;	
 		if(tnow!=told)
 		{	    
-			if(tnow<told)tcnt+=told-tnow;//这里注意一下SYSTICK是一个递减的计数器就可以了.
+			if(tnow<told)tcnt+=told-tnow;//Note here that SYSTICK is a decrementing counter.
 			else tcnt+=reload-tnow+told;	    
 			told=tnow;
-			if(tcnt>=ticks)break;//时间超过/等于要延迟的时间,则退出.
+			if(tcnt>=ticks)break;//Time exceeds / equals the time to delay, then exits.
 		}  
 	}; 									    
 }
-//延时nms
-//nms:要延时的ms数
+//delay nms
+//nms: the number of ms to delay
 void delay_ms(u16 nms)
 {	
-	if(OSRunning==TRUE)//如果os已经在跑了	    
+	if(OSRunning==OS_TRUE)//If os is already running	    
 	{		  
-		if(nms>=fac_ms)//延时的时间大于ucos的最少时间周期 
+		if(nms>=fac_ms)//The delay time is greater than the minimum time period of ucos 
 		{
-   			OSTimeDly(nms/fac_ms);//ucos延时
+   			OSTimeDly(nms/fac_ms);//Ucos delay
 		}
-		nms%=fac_ms;				//ucos已经无法提供这么小的延时了,采用普通方式延时    
+		nms%=fac_ms;				//Ucos has been unable to provide such a small delay, using the normal way delay    
 	}
-	delay_us((u32)(nms*1000));	//普通方式延时,此时ucos无法启动调度.
+	delay_us((u32)(nms*1000));	//Normal mode delay, ucos cannot start scheduling at this time.
 }
-#else//不用ucos时
-//延时nus
-//nus为要延时的us数.		    								   
+#else
+// Without ucos
+//delay nus
+//nus is the number of us to delay.	    								   
 void delay_us(u32 nus)
 {		
 	u32 temp;	    	 
-	SysTick->LOAD=nus*fac_us; //时间加载	  		 
-	SysTick->VAL=0x00;        //清空计数器
-	SysTick->CTRL=0x01 ;      //开始倒数 	 
+	SysTick->LOAD=nus*fac_us; //Time loading	  		 
+	SysTick->VAL=0x00;        //Empty counter
+	SysTick->CTRL=0x01 ;      //Start counting down 	 
 	do
 	{
 		temp=SysTick->CTRL;
 	}
-	while(temp&0x01&&!(temp&(1<<16)));//等待时间到达   
-	SysTick->CTRL=0x00;       //关闭计数器
-	SysTick->VAL =0X00;       //清空计数器	 
+	while(temp&0x01&&!(temp&(1<<16)));//Waiting time to arrive   
+	SysTick->CTRL=0x00;       //Close counter
+	SysTick->VAL =0X00;       //Empty counter	 
 }
 //delay nms
 // Note the scope of nms
@@ -133,16 +135,16 @@ void delay_us(u32 nus)
 void delay_ms(u16 nms)
 {	 		  	  
 	u32 temp;		   
-	SysTick->LOAD=(u32)nms*fac_ms;//时间加载(SysTick->LOAD为24bit)
-	SysTick->VAL =0x00;           //清空计数器
-	SysTick->CTRL=0x01 ;          //开始倒数  
+	SysTick->LOAD=(u32)nms*fac_ms;//Time loading (SysTick->LOAD is 24bit)
+	SysTick->VAL =0x00;           //Empty counter
+	SysTick->CTRL=0x01 ;          //Start counting down  
 	do
 	{
 		temp=SysTick->CTRL;
 	}
-	while(temp&0x01&&!(temp&(1<<16)));//等待时间到达   
-	SysTick->CTRL=0x00;       //关闭计数器
-	SysTick->VAL =0X00;       //清空计数器	  	    
+	while(temp&0x01&&!(temp&(1<<16)));//Waiting time to arrive   
+	SysTick->CTRL=0x00;       //Close counter
+	SysTick->VAL =0X00;       //Empty counter	  	    
 } 
 #endif
 			 

@@ -1,115 +1,65 @@
-/************************ (C) COPYLEFT 2010 Leafgrass *************************
-
-* File Name		: os_cpu_c.c 
-* Author		: Librae 
-* Date			: 08/10/2010
-* Description	: uCOS-II STM32 On the C language part of the porting code,
-* Includes task stack initialization code and hook functions, etc.
-
-******************************************************************************/
+/*============================================================================
+* Modified from the original to interoperate with CMIS as follows:
+* - renamed OS_CPU_SysTickHandler to CMSIS-compatible name SysTick_Handler
+*
+* Quantum Leaps, LLC. www.state-machine.com
+* 2015-03-23
+*===========================================================================*/
+/*
+*********************************************************************************************************
+*                                               uC/OS-II
+*                                         The Real-Time Kernel
+*
+*
+*                                (c) Copyright 2006, Micrium, Weston, FL
+*                                          All Rights Reserved
+*
+*                                           ARM Cortex-M3 Port
+*
+* File      : OS_CPU_C.C
+* Version   : V2.89
+* By        : Jean J. Labrosse
+*             Brian Nagel
+*
+* For       : ARMv7M Cortex-M3
+* Mode      : Thumb2
+* Toolchain : RealView Development Suite
+*             RealView Microcontroller Development Kit (MDK)
+*             ARM Developer Suite (ADS)
+*             Keil uVision
+*********************************************************************************************************
+*/
 
 #define  OS_CPU_GLOBALS
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include "uCOS_II.H"
-#include "os_cpu.h"
-#include <os_cfg_r.h>
+#include <ucos_ii.h>
+/*
+*********************************************************************************************************
+*                                          LOCAL VARIABLES
+*********************************************************************************************************
+*/
 
-/******************************************************************************************************************
-*                                    INITIALIZE A TASK'S STACK
-*
-* Description: This function is called by either OSTaskCreate() or OSTaskCreateExt() to initialize the
-*              stack frame of the task being created.  This function is highly processor specific.
-*
-* Arguments  : task          is a pointer to the task code
-*
-*              p_arg         is a pointer to a user supplied data area that will be passed to the task
-*                            when the task first executes.
-*
-*              ptos          is a pointer to the top of stack.  It is assumed that 'ptos' points to
-*                            a 'free' entry on the task stack.  If OS_STK_GROWTH is set to 1 then
-*                            'ptos' will contain the HIGHEST valid address of the stack.  Similarly, if
-*                            OS_STK_GROWTH is set to 0, the 'ptos' will contains the LOWEST valid address
-*                            of the stack.
-*
-*              opt           specifies options that can be used to alter the behavior of OSTaskStkInit().
-*                            (see uCOS_II.H for OS_TASK_OPT_xxx).
-*
-* Returns    : Always returns the location of the new top-of-stack once the processor registers have
-*              been placed on the stack in the proper order.
-*
-* Note(s)    : 1) Interrupts are enabled when your task starts executing.
-*              2) All tasks run in Thread mode, using process stack.
-*
-******************************************************************************************************************/
+#if OS_TMR_EN > 0u
+static  INT16U  OSTmrCtr;
+#endif
 
-OS_STK *OSTaskStkInit (void  (*task)(void  *parg), void  *parg, OS_STK  *ptos, INT16U  opt)
-{
-    OS_STK *stk;
+/*
+*********************************************************************************************************
+*                                          SYS TICK DEFINES
+*********************************************************************************************************
+*/
 
+#define  OS_CPU_CM3_NVIC_ST_CTRL    (*((volatile INT32U *)0xE000E010uL)) /* SysTick Ctrl & Status Reg. */
+#define  OS_CPU_CM3_NVIC_ST_RELOAD  (*((volatile INT32U *)0xE000E014uL)) /* SysTick Reload  Value Reg. */
+#define  OS_CPU_CM3_NVIC_ST_CURRENT (*((volatile INT32U *)0xE000E018uL)) /* SysTick Current Value Reg. */
+#define  OS_CPU_CM3_NVIC_ST_CAL     (*((volatile INT32U *)0xE000E01CuL)) /* SysTick Cal     Value Reg. */
+#define  OS_CPU_CM3_NVIC_PRIO_ST    (*((volatile INT8U  *)0xE000ED23uL)) /* SysTick Handler Prio  Reg. */
 
-    (void)opt;                                        /*  'opt' is not used, prevent warning   */
-                                                      
-                                                                            
-    stk = ptos;                                       /*  Load stack pointer          */
-                                                                                       
+#define  OS_CPU_CM3_NVIC_ST_CTRL_COUNT                    0x00010000uL   /* Count flag.                */
+#define  OS_CPU_CM3_NVIC_ST_CTRL_CLK_SRC                  0x00000004uL   /* Clock Source.              */
+#define  OS_CPU_CM3_NVIC_ST_CTRL_INTEN                    0x00000002uL   /* Interrupt enable.          */
+#define  OS_CPU_CM3_NVIC_ST_CTRL_ENABLE                   0x00000001uL   /* Counter mode.              */
+#define  OS_CPU_CM3_NVIC_PRIO_MIN                               0xFFu    /* Min handler prio.          */
 
-                                                      /*  Registers stacked as if     */
-                                                      /*  auto-saved on exception     */             
-	                                                
-
-    *(stk) = (INT32U)0x01000000L;                     /*  xPSR                        */ 
-    *(--stk) = (INT32U)task;                          /*  Entry Point of the task     */
-    *(--stk) = (INT32U)0xFFFFFFFEL;                   /*  R14 (LR)  (init value will  */
-                                                      /*  cause fault if ever used)   */                                                                           
-    *(--stk) = (INT32U)0x12121212L;                   /*  R12                         */
-    *(--stk) = (INT32U)0x03030303L;                   /*  R3                          */
-    *(--stk) = (INT32U)0x02020202L;                   /*  R2                          */
-    *(--stk) = (INT32U)0x01010101L;                   /*  R1                          */
-    *(--stk) = (INT32U)parg;                          /*  R0 : argument  */
-                                                      /*  Remaining registers saved on*/
-                                                      /*  process stack               */   
-    *(--stk) = (INT32U)0x11111111L;                   /*  R11                         */
-    *(--stk) = (INT32U)0x10101010L;                   /*  R10                         */
-    *(--stk) = (INT32U)0x09090909L;                   /*  R9                          */
-    *(--stk) = (INT32U)0x08080808L;                   /*  R8                          */
-    *(--stk) = (INT32U)0x07070707L;                   /*  R7                          */
-    *(--stk) = (INT32U)0x06060606L;                   /*  R6                          */
-    *(--stk) = (INT32U)0x05050505L;                   /*  R5                          */
-    *(--stk) = (INT32U)0x04040404L;                   /*  R4                          */
-
-    return(stk);
-}
-
- /*********************************************************************************************************
-   *                                            TASK RETURN HOOK
-   *
-   * Description: This function is called if a task accidentally returns.  In other words, a task should
-   *              either be an infinite loop or delete itself when done.
-   *
-   * Arguments  : p_tcb        Pointer to the task control block of the task that is returning.
-   *
-   * Note(s)    : None.
-   *********************************************************************************************************
-   */
-   
-   void  OSTaskReturnHook (OS_TCB  *p_tcb)
-   {
-   #if OS_CFG_APP_HOOKS_EN > 0u
-       if (OS_AppTaskReturnHookPtr != (OS_APP_HOOK_TCB)0) {
-           (*OS_AppTaskReturnHookPtr)(p_tcb);
-       }
-   #else
-       (void)p_tcb;                                            /* Prevent compiler warning                               */
-   #endif
-   }
-	
-/* 以下为一些钩子函数，全部为空函数。具体说明请看相关资料 */
-
-#if OS_CPU_HOOKS_EN
 /*
 *********************************************************************************************************
 *                                       OS INITIALIZATION HOOK
@@ -122,9 +72,25 @@ OS_STK *OSTaskStkInit (void  (*task)(void  *parg), void  *parg, OS_STK  *ptos, I
 * Note(s)    : 1) Interrupts should be disabled during this call.
 *********************************************************************************************************
 */
-#if OS_VERSION > 203
-void OSInitHookBegin (void)
+#if OS_CPU_HOOKS_EN > 0u
+void  OSInitHookBegin (void)
 {
+    INT32U   size;
+    OS_STK  *pstk;
+
+                                                           /* Clear exception stack for stack checking.*/
+    pstk = &OS_CPU_ExceptStk[0];
+    size = OS_CPU_EXCEPT_STK_SIZE;
+    while (size > 0u) {
+        size--;
+       *pstk++ = (OS_STK)0;
+    }
+
+    OS_CPU_ExceptStkBase = &OS_CPU_ExceptStk[OS_CPU_EXCEPT_STK_SIZE - 1u];
+
+#if OS_TMR_EN > 0u
+    OSTmrCtr = 0u;
+#endif
 }
 #endif
 
@@ -140,12 +106,11 @@ void OSInitHookBegin (void)
 * Note(s)    : 1) Interrupts should be disabled during this call.
 *********************************************************************************************************
 */
-#if OS_VERSION > 203
-void OSInitHookEnd (void)
+#if OS_CPU_HOOKS_EN > 0u
+void  OSInitHookEnd (void)
 {
 }
 #endif
-
 
 /*
 *********************************************************************************************************
@@ -158,12 +123,16 @@ void OSInitHookEnd (void)
 * Note(s)    : 1) Interrupts are disabled during this call.
 *********************************************************************************************************
 */
-void OSTaskCreateHook (OS_TCB *ptcb)
+#if OS_CPU_HOOKS_EN > 0u
+void  OSTaskCreateHook (OS_TCB *ptcb)
 {
-    ptcb = ptcb;                       /* Prevent compiler warning                                     */
+#if OS_APP_HOOKS_EN > 0u
+    App_TaskCreateHook(ptcb);
+#else
+    (void)ptcb;                                  /* Prevent compiler warning                           */
+#endif
 }
-
-
+#endif
 
 
 /*
@@ -177,9 +146,140 @@ void OSTaskCreateHook (OS_TCB *ptcb)
 * Note(s)    : 1) Interrupts are disabled during this call.
 *********************************************************************************************************
 */
-void OSTaskDelHook (OS_TCB *ptcb)
+#if OS_CPU_HOOKS_EN > 0u
+void  OSTaskDelHook (OS_TCB *ptcb)
 {
-    ptcb = ptcb;                       /* Prevent compiler warning                                     */
+#if OS_APP_HOOKS_EN > 0u
+    App_TaskDelHook(ptcb);
+#else
+    (void)ptcb;                                  /* Prevent compiler warning                           */
+#endif
+}
+#endif
+
+/*
+*********************************************************************************************************
+*                                             IDLE TASK HOOK
+*
+* Description: This function is called by the idle task.  This hook has been added to allow you to do
+*              such things as STOP the CPU to conserve power.
+*
+* Arguments  : none
+*
+* Note(s)    : 1) Interrupts are enabled during this call.
+*********************************************************************************************************
+*/
+#if OS_CPU_HOOKS_EN > 0u
+void  OSTaskIdleHook (void)
+{
+#if OS_APP_HOOKS_EN > 0u
+    App_TaskIdleHook();
+#endif
+}
+#endif
+
+/*
+*********************************************************************************************************
+*                                            TASK RETURN HOOK
+*
+* Description: This function is called if a task accidentally returns.  In other words, a task should
+*              either be an infinite loop or delete itself when done.
+*
+* Arguments  : ptcb      is a pointer to the task control block of the task that is returning.
+*
+* Note(s)    : none
+*********************************************************************************************************
+*/
+
+#if OS_CPU_HOOKS_EN > 0u
+void  OSTaskReturnHook (OS_TCB  *ptcb)
+{
+#if OS_APP_HOOKS_EN > 0u
+    App_TaskReturnHook(ptcb);
+#else
+    (void)ptcb;
+#endif
+}
+#endif
+
+/*
+*********************************************************************************************************
+*                                           STATISTIC TASK HOOK
+*
+* Description: This function is called every second by uC/OS-II's statistics task.  This allows your
+*              application to add functionality to the statistics task.
+*
+* Arguments  : none
+*********************************************************************************************************
+*/
+
+#if OS_CPU_HOOKS_EN > 0u
+void  OSTaskStatHook (void)
+{
+#if OS_APP_HOOKS_EN > 0u
+    App_TaskStatHook();
+#endif
+}
+#endif
+
+/*
+*********************************************************************************************************
+*                                        INITIALIZE A TASK'S STACK
+*
+* Description: This function is called by either OSTaskCreate() or OSTaskCreateExt() to initialize the
+*              stack frame of the task being created.  This function is highly processor specific.
+*
+* Arguments  : task          is a pointer to the task code
+*
+*              p_arg         is a pointer to a user supplied data area that will be passed to the task
+*                            when the task first executes.
+*
+*              ptos          is a pointer to the top of stack.  It is assumed that 'ptos' points to
+*                            a 'free' entry on the task stack.  If OS_STK_GROWTH is set to 1 then
+*                            'ptos' will contain the HIGHEST valid address of the stack.  Similarly, if
+*                            OS_STK_GROWTH is set to 0, the 'ptos' will contains the LOWEST valid address
+*                            of the stack.
+*
+*              opt           specifies options that can be used to alter the behavior of 
+().
+*                            (see uCOS_II.H for OS_TASK_OPT_xxx).
+*
+* Returns    : Always returns the location of the new top-of-stack once the processor registers have
+*              been placed on the stack in the proper order.
+*
+* Note(s)    : 1) Interrupts are enabled when your task starts executing.
+*              2) All tasks run in Thread mode, using process stack.
+*********************************************************************************************************
+*/
+
+OS_STK *OSTaskStkInit (void (*task)(void *p_arg), void *p_arg, OS_STK *ptos, INT16U opt)
+{
+    OS_STK *stk;
+
+
+    (void)opt;                                   /* 'opt' is not used, prevent warning                 */
+    stk       = ptos;                            /* Load stack pointer                                 */
+		
+                                                 /* Registers stacked as if auto-saved on exception    */
+    *(stk)    = (INT32U)0x01000000uL;            /* xPSR                                               */
+    *(--stk)  = (INT32U)task;                    /* Entry Point                                        */
+    *(--stk)  = (INT32U)0xFFFFFFFEuL;            /* R14 (LR)                                           */
+    *(--stk)  = (INT32U)0x12121212uL;            /* R12                                                */
+    *(--stk)  = (INT32U)0x03030303uL;            /* R3                                                 */
+    *(--stk)  = (INT32U)0x02020202uL;            /* R2                                                 */
+    *(--stk)  = (INT32U)0x01010101uL;            /* R1                                                 */
+    *(--stk)  = (INT32U)p_arg;                   /* R0 : argument                                      */
+		
+                                                 /* Remaining registers saved on process stack         */
+    *(--stk)  = (INT32U)0x11111111uL;            /* R11                                                */
+    *(--stk)  = (INT32U)0x10101010uL;            /* R10                                                */
+    *(--stk)  = (INT32U)0x09090909uL;            /* R9                                                 */
+    *(--stk)  = (INT32U)0x08080808uL;            /* R8                                                 */
+    *(--stk)  = (INT32U)0x07070707uL;            /* R7                                                 */
+    *(--stk)  = (INT32U)0x06060606uL;            /* R6                                                 */
+    *(--stk)  = (INT32U)0x05050505uL;            /* R5                                                 */
+    *(--stk)  = (INT32U)0x04040404uL;            /* R4                                                 */
+    return (stk);
 }
 
 /*
@@ -193,46 +293,40 @@ void OSTaskDelHook (OS_TCB *ptcb)
 *
 * Note(s)    : 1) Interrupts are disabled during this call.
 *              2) It is assumed that the global pointer 'OSTCBHighRdy' points to the TCB of the task that
-*                 will be 'switched in' (i.e. the highest priority task) and, 'OSTCBCur' points to the 
+*                 will be 'switched in' (i.e. the highest priority task) and, 'OSTCBCur' points to the
 *                 task being switched out (i.e. the preempted task).
 *********************************************************************************************************
 */
-void OSTaskSwHook (void)
+#if (OS_CPU_HOOKS_EN > 0u) && (OS_TASK_SW_HOOK_EN > 0u)
+void  OSTaskSwHook (void)
 {
+#if OS_APP_HOOKS_EN > 0u
+    App_TaskSwHook();
+#endif
 }
+#endif
 
 /*
 *********************************************************************************************************
-*                                           STATISTIC TASK HOOK
+*                                           OS_TCBInit() HOOK
 *
-* Description: This function is called every second by uC/OS-II's statistics task.  This allows your 
-*              application to add functionality to the statistics task.
-*
-* Arguments  : none
-*********************************************************************************************************
-*/
-void OSTaskStatHook (void)
-{
-}
-
-/*
-*********************************************************************************************************
-*                                           OSTCBInit() HOOK
-*
-* Description: This function is called by OSTCBInit() after setting up most of the TCB.
+* Description: This function is called by OS_TCBInit() after setting up most of the TCB.
 *
 * Arguments  : ptcb    is a pointer to the TCB of the task being created.
 *
 * Note(s)    : 1) Interrupts may or may not be ENABLED during this call.
 *********************************************************************************************************
 */
-#if OS_VERSION > 203
-void OSTCBInitHook (OS_TCB *ptcb)
+#if OS_CPU_HOOKS_EN > 0u
+void  OSTCBInitHook (OS_TCB *ptcb)
 {
-    ptcb = ptcb;                                           /* Prevent Compiler warning                 */
+#if OS_APP_HOOKS_EN > 0u
+    App_TCBInitHook(ptcb);
+#else
+    (void)ptcb;                                  /* Prevent compiler warning                           */
+#endif
 }
 #endif
-
 
 /*
 *********************************************************************************************************
@@ -245,30 +339,70 @@ void OSTCBInitHook (OS_TCB *ptcb)
 * Note(s)    : 1) Interrupts may or may not be ENABLED during this call.
 *********************************************************************************************************
 */
-void OSTimeTickHook (void)
+#if (OS_CPU_HOOKS_EN > 0u) && (OS_TIME_TICK_HOOK_EN > 0u)
+void  OSTimeTickHook (void)
 {
-}
+#if OS_APP_HOOKS_EN > 0u
+    App_TimeTickHook();
+#endif
 
+#if OS_TMR_EN > 0u
+    OSTmrCtr++;
+    if (OSTmrCtr >= (OS_TICKS_PER_SEC / OS_TMR_CFG_TICKS_PER_SEC)) {
+        OSTmrCtr = 0;
+        OSTmrSignal();
+    }
+#endif
+}
+#endif
 
 /*
 *********************************************************************************************************
-*                                             IDLE TASK HOOK
+*                                          SYS TICK HANDLER
 *
-* Description: This function is called by the idle task.  This hook has been added to allow you to do  
-*              such things as STOP the CPU to conserve power.
+* Description: Handle the system tick (SysTick) interrupt, which is used to generate the uC/OS-II tick
+*              interrupt.
 *
-* Arguments  : none
+* Arguments  : none.
 *
-* Note(s)    : 1) Interrupts are enabled during this call.
+* Note(s)    : 1) This function MUST be placed on entry 15 of the Cortex-M3 vector table.
 *********************************************************************************************************
 */
-#if OS_VERSION >= 251
-void OSTaskIdleHook (void)
+
+void  SysTick_Handler (void)  /* QL was: void  OS_CPU_SysTickHandler (void) */
 {
+    OS_CPU_SR  cpu_sr;
+
+
+    OS_ENTER_CRITICAL();                         /* Tell uC/OS-II that we are starting an ISR          */
+    OSIntNesting++;
+    OS_EXIT_CRITICAL();
+
+    OSTimeTick();                                /* Call uC/OS-II's OSTimeTick()                       */
+
+    OSIntExit();                                 /* Tell uC/OS-II that we are leaving the ISR          */
 }
 
-#endif
+/*
+*********************************************************************************************************
+*                                          INITIALIZE SYS TICK
+*
+* Description: Initialize the SysTick.
+*
+* Arguments  : cnts          is the number of SysTick counts between two OS tick interrupts.
+*
+* Note(s)    : 1) This function MUST be called after OSStart() & after processor initialization.
+*********************************************************************************************************
+*/
 
-#endif
+void  OS_CPU_SysTickInit (INT32U  cnts)
+{
+    OS_CPU_CM3_NVIC_ST_RELOAD = cnts - 1u;
+                                                 /* Set prio of SysTick handler to min prio.           */
+    OS_CPU_CM3_NVIC_PRIO_ST   = OS_CPU_CM3_NVIC_PRIO_MIN;
+                                                 /* Enable timer.                                      */
+    OS_CPU_CM3_NVIC_ST_CTRL  |= OS_CPU_CM3_NVIC_ST_CTRL_CLK_SRC | OS_CPU_CM3_NVIC_ST_CTRL_ENABLE;
+                                                 /* Enable timer interrupt.                            */
+    OS_CPU_CM3_NVIC_ST_CTRL  |= OS_CPU_CM3_NVIC_ST_CTRL_INTEN;
+}
 
-/************************ (C) COPYLEFT 2010 Leafgrass ************************/

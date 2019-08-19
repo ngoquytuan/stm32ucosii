@@ -33,8 +33,8 @@ static const int NTP_PACKET_RAWSIZE = 56;
 
 extern time_t unixTime_last_sync;// lan chuan gio gan nhat 
 /* SNTP Packet array */
-extern uint8_t serverPacket[NTP_PACKET_SIZE] ;
-extern uint8_t clientPacket[NTP_PACKET_RAWSIZE] ;
+//extern uint8_t serverPacket[NTP_PACKET_SIZE] ;
+//extern uint8_t clientPacket[NTP_PACKET_RAWSIZE] ;
 extern time_t micros_recv ;
 extern time_t micros_offset;
 extern time_t transmitTime;
@@ -42,6 +42,10 @@ extern time_t micros_transmit;
 extern time_t recvTime;
 
 int32_t NTPUDP(uint8_t sn);
-void wzn_event_handle();
-void ntpserverdefaultconfig();
-int32_t ntpserverprocess();
+void wzn_event_handle(void);
+void ntpserverdefaultconfig(void);
+int32_t ntpserverprocess(void);
+
+
+
+

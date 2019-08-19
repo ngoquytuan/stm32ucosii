@@ -11,6 +11,7 @@
 
 #include "timerHandler.h"
 #include <stdio.h>
+#include <ucos_ii.h>
 struct tm* timeinfo;
 extern time_t timenow;
 volatile UINT Timer;
@@ -28,7 +29,15 @@ volatile uint16_t phystatus_check_cnt = 0;
 /* 1kHz timer process                          */
 /*---------------------------------------------*/
 void TIM2_IRQHandler(void)
-{
+{	
+    OS_CPU_SR  cpu_sr;
+		//OSIntEnter();
+
+    OS_ENTER_CRITICAL();                         /* Tell uC/OS-II that we are starting an ISR          */
+    
+    OS_EXIT_CRITICAL();
+                
+    
 	if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET )
 	{
 		// Also cleared the wrong interrupt flag in the ISR
@@ -43,7 +52,7 @@ void TIM2_IRQHandler(void)
 		phystatus_check_cnt++;
 		if(msec_cnt >= 1000 - 1) // second
 		{
-			printf("1s\r\n");
+			//printf("1s\r\n");
 			sec_cnt++;
 			//httpServer_time_handler();
 			//DHCP_time_handler();
@@ -58,6 +67,7 @@ void TIM2_IRQHandler(void)
 			sec_cnt = 0;
 		}*/
 	}
+	OSIntExit();  
 }
 
 /**
@@ -79,7 +89,7 @@ void Timer_Configuration(void)
   NVIC_Init(&NVIC_InitStructure);
 
   /* Time base configuration */
-  TIM_TimeBaseStructure.TIM_Period = 1000;// count 10000 tick then interrupt, gia tri max cua bo dem
+  TIM_TimeBaseStructure.TIM_Period = 10000;// count 10000 tick then interrupt, gia tri max cua bo dem
   TIM_TimeBaseStructure.TIM_Prescaler = 0;
   TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
@@ -93,13 +103,17 @@ void Timer_Configuration(void)
   TIM_Cmd(TIM2, ENABLE);
 
   /* TIM IT enable */
-  TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+  //TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
 
-#ifdef ENABLE_TIMER_INT
-  // Timer for delay
+/***************************************************************************************************************/
+	//	16/Aug/2019, Tuan, use Tim3 for make a couter 0-0.9999 second for NTP fraction
+	//TIM3
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 
+	//tim uptade frequency = TIM_CLK/(TIM_PSC+1)/(TIM_ARR + 1)
+	//TIM_CLK/(TIM_Period + 1) /(Prescaler+1)
   /* Time base configuration */
-  TIM_TimeBaseStructure.TIM_Period = 1;
+  TIM_TimeBaseStructure.TIM_Period = 9999;// count 9999 tick then interrupt, gia tri max cua bo dem
   TIM_TimeBaseStructure.TIM_Prescaler = 0;
   TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
@@ -107,14 +121,10 @@ void Timer_Configuration(void)
   TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
 
   /* Prescaler configuration */
-  TIM_PrescalerConfig(TIM3, 71, TIM_PSCReloadMode_Immediate);
+  TIM_PrescalerConfig(TIM3, 7199, TIM_PSCReloadMode_Immediate);
 
   /* TIM enable counter */
-  TIM_Cmd(TIM3, DISABLE);
-
-  /* TIM IT enable */
-  TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
-#endif
+  TIM_Cmd(TIM3, ENABLE);
 
 }
 

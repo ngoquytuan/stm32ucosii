@@ -165,16 +165,19 @@ uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t * file_
 uint8_t * set_basic_config_setting(uint8_t * uri)
 {
 	uint8_t * param;
-	uint8_t str_size, baudrate_idx;
+	//uint8_t str_size, baudrate_idx;
 	S2E_Packet *value = get_S2E_Packet_pointer();
-
+  
 	// Redirection IP address init
-	uint8_t return_ip[4] = {value->network_info_common.local_ip[0],
-							value->network_info_common.local_ip[1],
-							value->network_info_common.local_ip[2],
-							value->network_info_common.local_ip[3]};
-
+	uint8_t return_ip[4];
 	uint8_t * ip = return_ip;
+	
+	return_ip[0] = value->network_info_common.local_ip[0];
+	return_ip[1] = value->network_info_common.local_ip[1];
+	return_ip[2] = value->network_info_common.local_ip[2];
+	return_ip[3] = value->network_info_common.local_ip[3];
+
+	
   
 	//boc tach IP
 		if((param = get_http_param_value((char *)uri, "ip")))
@@ -247,7 +250,7 @@ uint8_t http_post_cgi_handler(uint8_t * uri_name, st_http_request * p_http_reque
 {
 	uint8_t ret = HTTP_OK;
 	uint16_t len = 0;
-	uint8_t val = 0;
+	//uint8_t val = 0;
 	uint8_t* newip;
 
 	if(predefined_set_cgi_processor(uri_name, p_http_request->URI, buf, &len))

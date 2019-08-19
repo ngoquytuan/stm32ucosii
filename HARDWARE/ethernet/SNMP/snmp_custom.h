@@ -22,7 +22,7 @@ extern const int32_t maxData;
 #define COMMUNITY_SIZE				(strlen(COMMUNITY))
 
 /* Predefined function: Response value control */
-void initTable();
+void initTable(void);
 
 /* User defined functions: LED control examples */
 #ifdef _USE_WIZNET_W5500_EVB_

@@ -6,7 +6,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include "myapp.h"
+#include <ucos_ii.h>
+#include "myapp2.h"
+#include "timerHandler.h"
 #include "delay.h"
 #include "sys.h"
 #include "led.h"
@@ -14,6 +16,7 @@
 #include "usart.h"
 #include "spi.h"
 #include "w5500init.h"
+#include "sntp.h"
 //#include "lcd.h"
 //#include "spi.h"
 //#include "flash.h"

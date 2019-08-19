@@ -338,7 +338,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F10X_MD,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\HARDWARE\LED;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;.\app;..\STM32F10x_FWLib\inc;..\CORE;..\HARDWARE\KEY;..\HARDWARE\EXTI;..\HARDWARE\WDG;..\HARDWARE\TIMER;..\HARDWARE\PWM;..\HARDWARE\LCD;..\HARDWARE\WKUP;..\HARDWARE\ADC;..\HARDWARE\TSensor;..\HARDWARE\IIC;..\HARDWARE\24CXX;..\HARDWARE\SPI;..\HARDWARE\FLASH;..\HARDWARE\TOUCH;..\HARDWARE\MMC_SD;..\FATFS\src;..\FATFS\exfuns;..\TEXT;..\TEXT;..\UCOSII\CONFIG;..\UCOSII\CORE;..\UCOSII\PORT;..\HARDWARE\REMOTE;..\HARDWARE\PlatformHandler;..\HARDWARE\ethernet\DNS;..\HARDWARE\ethernet;..\HARDWARE\ethernet\W5500;..\HARDWARE\ethernet\SNTP;..\HARDWARE\ethernet\httpServer</IncludePath>
+              <IncludePath>..\HARDWARE\LED;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;.\app;..\STM32F10x_FWLib\inc;..\CORE;..\HARDWARE\KEY;..\HARDWARE\EXTI;..\HARDWARE\WDG;..\HARDWARE\TIMER;..\HARDWARE\PWM;..\HARDWARE\LCD;..\HARDWARE\WKUP;..\HARDWARE\ADC;..\HARDWARE\TSensor;..\HARDWARE\IIC;..\HARDWARE\24CXX;..\HARDWARE\SPI;..\HARDWARE\FLASH;..\HARDWARE\TOUCH;..\HARDWARE\MMC_SD;..\FATFS\src;..\FATFS\exfuns;..\TEXT;..\TEXT;..\UCOSII\CONFIG;..\UCOSII\CORE;..\UCOSII\PORT;..\HARDWARE\REMOTE;..\HARDWARE\PlatformHandler;..\HARDWARE\ethernet\DNS;..\HARDWARE\ethernet;..\HARDWARE\ethernet\W5500;..\HARDWARE\ethernet\SNTP;..\HARDWARE\ethernet\httpServer;..\HARDWARE\ethernet\SNMP</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -396,6 +396,11 @@
               <FileName>system_stm32f10x.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\app\system_stm32f10x.c</FilePath>
+            </File>
+            <File>
+              <FileName>myapp2.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\app\myapp2.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -786,6 +791,56 @@
               <FileName>w5500init.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\ethernet\w5500init.c</FilePath>
+            </File>
+            <File>
+              <FileName>sntp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\SNTP\sntp.c</FilePath>
+            </File>
+            <File>
+              <FileName>dns.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\DNS\dns.c</FilePath>
+            </File>
+            <File>
+              <FileName>ntpserver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\ntpserver.c</FilePath>
+            </File>
+            <File>
+              <FileName>snmp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\SNMP\snmp.c</FilePath>
+            </File>
+            <File>
+              <FileName>snmp_custom.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\SNMP\snmp_custom.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>http</GroupName>
+          <Files>
+            <File>
+              <FileName>ConfigData.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\httpServer\ConfigData.c</FilePath>
+            </File>
+            <File>
+              <FileName>httpParser.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\httpServer\httpParser.c</FilePath>
+            </File>
+            <File>
+              <FileName>httpServer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\httpServer\httpServer.c</FilePath>
+            </File>
+            <File>
+              <FileName>httpUtil.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\ethernet\httpServer\httpUtil.c</FilePath>
             </File>
           </Files>
         </Group>

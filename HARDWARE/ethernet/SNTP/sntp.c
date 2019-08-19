@@ -6,18 +6,13 @@
  */
 
 
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
+
 #include "sntp.h"
-#include "socket.h"
-#include "dns.h"
-#include "w5500init.h"
 
 extern time_t timenow;
-uint8_t TimeIsSet = 0;
-uint16_t RetrySend = 0; //60 giay
-uint16_t sycnPeriod = 0;// 1 gio
+//uint8_t TimeIsSet = 0;
+//uint16_t RetrySend = 0; //60 giay
+//uint16_t sycnPeriod = 0;// 1 gio
 
 uint8_t Domain_ntpTimeServer[] = "0.asia.pool.ntp.org";    // for Example domain name
 //uint8_t Domain_IP[4]  = {0, };               // Translated IP address by DNS
@@ -30,7 +25,7 @@ uint8_t ntpTimeServer_ip[4] ={139, 199, 215, 251};// NTP time server
 uint8_t ntpmessage[48]={0};
 //uint8_t ntpServerRespond[56];
 // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
-const uint32_t seventyYears = 2208988800;
+const uint32_t seventyYears = 2208988800u;
 
 /*
 00)UTC-12:00 Baker Island, Howland Island (both uninhabited)
@@ -88,9 +83,9 @@ const uint32_t seventyYears = 2208988800;
 
 
 
-void SNTP_init()
+void SNTP_init(void)
 {
-	uint8_t i;
+//	uint8_t i;
 	//ntpformat NTPformat;
 	int32_t ret = 0;
 	/* DNS client initialization */
@@ -137,7 +132,7 @@ void SNTP_init()
 	}*/
 	// Initialize values needed to form NTP request
 	  // (see URL above for details on the packets)
-	  ntpmessage[0] = 0b11100011;   // LI, Version, Mode
+	  ntpmessage[0] = 0xE3;//0b11100011;   // LI, Version, Mode
 	  ntpmessage[1] = 0;     // Stratum, or type of clock
 	  ntpmessage[2] = 6;     // Polling Interval
 	  ntpmessage[3] = 0xEC;  // Peer Clock Precision
@@ -151,19 +146,14 @@ void SNTP_init()
 
 int8_t SNTP_run()//datetime sntp;
 {
-	uint32_t ret;
+	//uint32_t ret;
 	uint16_t size;
 	uint32_t destip = 0;
 	uint16_t destport;
 	//uint16_t startindex = 40; //last 8-byte of data_buf[size is 48 byte] is xmt, so the startindex should be 40
-	int8_t i;
+	//int8_t i;
 	uint32_t sec;
-	if (sycnPeriod >= 160) // dong bo lai thoi gian
-	{
-		TimeIsSet = 0;
-		sycnPeriod = 0;
-	}
-	if(TimeIsSet == 1) return 1;
+	//printf("SNTP_run\r\n");
 	
 	switch(getSn_SR(SOCK_SNTP))
 	{
@@ -179,17 +169,18 @@ int8_t SNTP_run()//datetime sntp;
 			timenow = sec-seventyYears;
 			
 			printf("Seconds: %u\r\n",timenow);
-			TimeIsSet = 1;
+
 			close(SOCK_SNTP);
 
 			return 1;
 		}
-				if(TimeIsSet == 0) //chua chinh gio
+				//if(TimeIsSet == 0) //chua chinh gio
 			{
-				if(RetrySend > 5) //Try Again gui ban tin hoi gio
+				//if(RetrySend > 5) //Try Again gui ban tin hoi gio
 				{
-					RetrySend = 0;
+					//RetrySend = 0;
 					sendto(SOCK_SNTP,ntpmessage,48,ntpTimeServer_ip,123);
+					//printf("Gui ban tin di");
 					//sendto(SOCK_SNTP,ntpmessage,48,ntpTimeServer_ip,123);
 					/*
 					printf("Gui ban tin di :");//35 0 6 236 0 0 0 0 0 0 0 0 49 78 49 52 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -205,12 +196,10 @@ int8_t SNTP_run()//datetime sntp;
 			
 			
 		
-		break;
+		//break;
 	case SOCK_CLOSED:
-	    //printf("%d:SNTP client try to start at port %d\r\n",SOCK_SNTP,sntp_port);
-		//socket(NTP_SOCKET,Sn_MR_UDP,sntp_port,0);
-		if((ret=socket(SOCK_SNTP,Sn_MR_UDP,sntp_port,0x00)) != SOCK_SNTP)
-            return ret;
+		if((socket(SOCK_SNTP,Sn_MR_UDP,sntp_port,0x00)) != SOCK_SNTP) printf(" Socket[%d] UDP Socket for SNTP client ERROR\r\n", SOCK_SNTP);
+
 		//printf("%d:Opened, port [%d]\r\n",SOCK_SNTP, sntp_port);
 		printf(" Socket[%d] UDP Socket for SNTP client started at port [%d]\r\n", SOCK_SNTP, sntp_port);
 		break;

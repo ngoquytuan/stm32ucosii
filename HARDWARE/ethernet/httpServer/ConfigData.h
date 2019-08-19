@@ -117,20 +117,20 @@ typedef struct __S2E_Packet {
 	struct __options options;
 } __attribute__((packed)) S2E_Packet;
 
-S2E_Packet* get_S2E_Packet_pointer();
-void set_S2E_Packet_to_factory_value();
-void load_S2E_Packet_from_storage();
-void save_S2E_Packet_to_storage();
+S2E_Packet* get_S2E_Packet_pointer(void);
+void set_S2E_Packet_to_factory_value(void);
+void load_S2E_Packet_from_storage(void);
+void save_S2E_Packet_to_storage(void);
 void get_S2E_Packet_value(void *dest, const void *src, uint16_t size);
 void set_S2E_Packet_value(void *dest, const void *value, const uint16_t size);
 void set_S2E_Packet(wiz_NetInfo *net);
 void get_S2E_Packet(wiz_NetInfo *net);
 
-void display_Net_Info();
-void Mac_Conf();
-void Net_Conf();
-void set_dhcp_mode();
-void set_static_mode();
+void display_Net_Info(void);
+void Mac_Conf(void);
+void Net_Conf(void);
+void set_dhcp_mode(void);
+void set_static_mode(void);
 void set_mac(uint8_t *mac);
 
 #endif /* S2E_PACKET_H_ */

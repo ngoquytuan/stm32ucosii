@@ -29,10 +29,10 @@ void insertRespLen(int32_t reqStart, int32_t respStart, int32_t size);
 int32_t parseVarBind(int32_t reqType, int32_t index);
 int32_t parseSequence(int32_t reqType, int32_t index);
 int32_t parseSequenceOf(int32_t reqType);
-int32_t parseRequest();
-int32_t parseCommunity();
-int32_t parseVersion();
-int32_t parseSNMPMessage();
+int32_t parseRequest(void);
+int32_t parseCommunity(void);
+int32_t parseVersion(void);
+int32_t parseSNMPMessage(void);
 
 // Debugging function
 #ifdef _SNMP_DEBUG_
@@ -148,7 +148,7 @@ void snmpd_init(uint8_t * managerIP, uint8_t * agentIP, uint8_t sn_agent, uint8_
 
 int32_t snmpd_run(void)
 {
-    int32_t ret;
+  int32_t ret;
 	int32_t len = 0;
     
 	uint8_t svr_addr[6];

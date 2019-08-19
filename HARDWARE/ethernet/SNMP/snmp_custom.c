@@ -131,7 +131,7 @@ const int32_t maxData = (sizeof(snmpData) / sizeof(dataEntryType));
 void initTable()
 {
 	// Example integer value for [OID 1.3.6.1.2.1.1.7.0]
-	snmpData[6].u.intval = -15;
+	snmpData[6].u.intval = -15;//-15;
 
 }
 
